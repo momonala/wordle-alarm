@@ -1,0 +1,4 @@
+assets/
+tmp/
+__pycache__/
+values.py

@@ -61,7 +61,6 @@ def get_wordle_stats(page) -> dict[str, int]:
 
 
 def _is_late_night() -> bool:
-    return True
     return datetime.now().hour > 22
 
 
@@ -75,7 +74,7 @@ def check_wordle_status() -> dict[str, bool]:
         page = context.new_page()
 
         # Load and set cookies before navigating
-        cookies = [] #if MODE == "TEST" else load_cookies()
+        cookies = load_cookies()
         context.add_cookies(cookies)
         logger.info("Loaded cookies for authentication")
 

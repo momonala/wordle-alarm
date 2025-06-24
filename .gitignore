@@ -2,3 +2,5 @@ assets/
 tmp/
 __pycache__/
 values.py
+.ipynb_checkpoints/
+*.ipynb

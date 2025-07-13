@@ -79,7 +79,7 @@ def check_wordle_status() -> dict[str, bool]:
         logger.info("Loaded cookies for authentication")
 
         page.goto(WORDLE_URL)
-        page.wait_for_timeout(2000)  # Pause to load the page
+        page.wait_for_timeout(10000)  # Pause to load the page
 
         play_button = page.get_by_test_id(GameMode.PLAY.value).count()
         continue_button = page.get_by_test_id(GameMode.CONTINUE.value).count()

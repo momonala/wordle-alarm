@@ -4,3 +4,5 @@ __pycache__/
 values.py
 .ipynb_checkpoints/
 *.ipynb
+.DS_Store
+

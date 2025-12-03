@@ -1,6 +1,12 @@
 import json
+import logging
+from pathlib import Path
 
-COOKIES_PATH = "assets/cookies.json"
+logger = logging.getLogger(__name__)
+
+# Get path relative to project root (parent of src/)
+PROJECT_ROOT = Path(__file__).parent.parent
+COOKIES_PATH = PROJECT_ROOT / "secrets" / "cookies.json"
 
 
 def load_cookies() -> list[dict]:
@@ -11,7 +17,7 @@ def load_cookies() -> list[dict]:
         Each cookie must have sameSite as one of: "Strict", "Lax", or "None"
     """
     try:
-        with open(COOKIES_PATH, "r") as f:
+        with open(str(COOKIES_PATH), "r") as f:
             cookies = json.load(f)
 
         # Format cookies for Playwright

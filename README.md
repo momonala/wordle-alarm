@@ -19,9 +19,9 @@ flowchart LR
         Cookies[cookies.json]
     end
     subgraph App
-        Scheduler[scheduler.py]
-        Main[main.py]
-        Solver[solver.py]
+        Scheduler[src/scheduler.py]
+        Main[src/main.py]
+        Solver[src/solver.py]
     end
 
     Scheduler -->|scheduled checks| Main
@@ -35,7 +35,7 @@ flowchart LR
 ## Prerequisites
 
 - Python 3.12
-- Poetry
+- uv (Python package manager)
 - Chromium (installed via Playwright)
 - Telegram Bot token and chat ID
 - NYT Wordle cookies (for authenticated session)
@@ -50,14 +50,14 @@ flowchart LR
 
 2. Install dependencies:
    ```bash
-   pip install poetry
-   poetry install --no-root
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   uv sync
    ```
 
 3. Install Playwright browsers:
    ```bash
-   playwright install chromium
-   playwright install-deps
+   uv run playwright install chromium
+   uv run playwright install-deps
    ```
 
 4. Configure credentials in `values.py`:
@@ -66,10 +66,10 @@ flowchart LR
    TELEGRAM_CHAT_ID = "your-chat-id"
    ```
 
-5. Export NYT cookies to `assets/cookies.json`:
+5. Export NYT cookies to `secrets/cookies.json`:
    - Log into nytimes.com/games/wordle
    - Use a browser extension to export cookies as JSON
-   - Save to `assets/cookies.json`
+   - Save to `secrets/cookies.json`
 
    Required cookie format:
    ```json
@@ -91,12 +91,12 @@ flowchart LR
 
 **Manual check:**
 ```bash
-python main.py
+python src/main.py
 ```
 
 **Scheduled daemon:**
 ```bash
-python scheduler.py
+python src/scheduler.py
 ```
 
 Default schedule: 10:00, 17:00, 20:00, 22:30, 23:30 daily
@@ -105,14 +105,15 @@ Default schedule: 10:00, 17:00, 20:00, 22:30, 23:30 daily
 
 ```
 wordle-alarm/
-├── main.py                   # Entry point, Wordle status checker
-├── solver.py                 # Auto-solver algorithm and game state
-├── scheduler.py              # Cron-like scheduler daemon
-├── auth.py                   # Cookie loading/formatting for Playwright
-├── values.py                 # Telegram credentials (gitignored)
+├── src/
+│   ├── main.py               # Entry point, Wordle status checker
+│   ├── solver.py             # Auto-solver algorithm and game state
+│   ├── scheduler.py          # Cron-like scheduler daemon
+│   ├── auth.py               # Cookie loading/formatting for Playwright
+│   └── values.py             # Telegram credentials (gitignored)
 ├── wordle-answers.csv        # Word list with frequency scores
-├── pyproject.toml            # Poetry dependencies
-├── assets/
+├── pyproject.toml            # Project dependencies
+├── secrets/
 │   └── cookies.json          # NYT session cookies (gitignored)
 ├── install/
 │   ├── install.sh            # Linux setup script
@@ -158,7 +159,7 @@ WordleState
 
 | File | Purpose |
 |------|---------|
-| `assets/cookies.json` | NYT authentication cookies |
+| `secrets/cookies.json` | NYT authentication cookies |
 | `wordle-answers.csv` | 14,856 five-letter words with frequency scores |
 | `tmp/wordle_page_dump.html` | Debug: last page HTML dump |
 
@@ -170,7 +171,7 @@ The `install/` directory contains systemd setup:
 ./install/install.sh
 ```
 
-This creates a conda environment, installs dependencies, and registers a systemd service that runs `scheduler.py` as a daemon.
+This installs uv (if not already installed), installs dependencies, and registers a systemd service that runs `src/scheduler.py` as a daemon.
 
 Service management:
 ```bash
@@ -181,7 +182,7 @@ sudo journalctl -u projects_wordle_alarm.service -f
 
 ## Environment Variables
 
-None. All config is in `values.py` and `assets/cookies.json`.
+None. All config is in `values.py` and `secrets/cookies.json`.
 
 ## Known Limitations
 

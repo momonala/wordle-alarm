@@ -2,6 +2,7 @@ import logging
 import re
 from contextlib import contextmanager
 from datetime import datetime
+from pathlib import Path
 
 import requests
 from playwright.sync_api import sync_playwright
@@ -13,8 +14,12 @@ from values import TELEGRAM_CHAT_ID, TELEGRAM_TOKEN
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+# Get path relative to project root (parent of src/)
+PROJECT_ROOT = Path(__file__).parent.parent
+
 WORDLE_URL = "https://www.nytimes.com/games/wordle/index.html"
 MODE = "REAL"
+WAIT_FOR_LOAD_TIME_MS = 3000
 
 
 @contextmanager
@@ -41,9 +46,11 @@ def send_telegram_alert(message: str):
 def dump_page_content_to_file(page) -> None:
     """Dump page content to a specified file."""
     page_content = page.content()
-    with open("tmp/wordle_page_dump.html", "w", encoding="utf-8") as file:
+    dump_path = PROJECT_ROOT / "tmp" / "wordle_page_dump.html"
+    dump_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(str(dump_path), "w", encoding="utf-8") as file:
         file.write(page_content)
-    logger.info(f"Page content dumped to tmp/wordle_page_dump.html")
+    logger.info("Page content dumped to tmp/wordle_page_dump.html")
 
 
 def get_wordle_stats(page) -> dict[str, int]:
@@ -60,6 +67,22 @@ def get_wordle_stats(page) -> dict[str, int]:
     }
 
 
+def open_stats_panel(page) -> dict[str, int]:
+    """Open the latest results modal and return the parsed stats."""
+
+    def _click_button(test_id: str, role_name: str) -> None:
+        button = page.get_by_test_id(test_id)
+        if not button.count():
+            button = page.get_by_role("button", name=role_name)
+        button.click()
+
+    _click_button("Admire Puzzle", "Admire Puzzle")
+    page.wait_for_timeout(WAIT_FOR_LOAD_TIME_MS)
+
+    _click_button("See Results", "See Results")
+    page.wait_for_timeout(WAIT_FOR_LOAD_TIME_MS)
+
+
 def _is_late_night() -> bool:
     return datetime.now().hour > 22
 
@@ -70,7 +93,7 @@ def check_wordle_status() -> dict[str, bool]:
 
     with playwright_context() as browser:
         context = browser.new_context()
-        # context = browser.new_context(storage_state="assets/auth.json")
+        # context = browser.new_context(storage_state="secrets/auth.json")
         page = context.new_page()
 
         # Load and set cookies before navigating
@@ -101,11 +124,8 @@ def check_wordle_status() -> dict[str, bool]:
         else:
             logger.info("Game is played today!")
             has_finished = True
-
-            page.get_by_test_id("See Stats").click()
-            page.wait_for_timeout(1000)  # Pause to load the page
+            open_stats_panel(page)
             stats = get_wordle_stats(page)
-
             logger.info(
                 f"Games Played: {stats['played']}, Win %: {stats['win_percentage']}, "
                 f"Current Streak: {stats['current_streak']}, Max Streak: {stats['max_streak']}"

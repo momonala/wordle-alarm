@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from time import sleep
 
 import pandas as pd
@@ -9,7 +10,9 @@ from bs4 import BeautifulSoup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-WORDLE_WORDS = pd.read_csv("wordle-answers.csv")
+# Get path relative to project root (parent of src/)
+PROJECT_ROOT = Path(__file__).parent.parent
+WORDLE_WORDS = pd.read_csv(PROJECT_ROOT / "wordle-answers.csv")
 
 
 class GameMode(Enum):
@@ -141,7 +144,7 @@ def filter_possible_words(wordle_state: WordleState) -> list[str]:
         # Skip words that have already been guessed
         if word in guessed_words:
             return False
-            
+
         # Check correct positions
         for pos, letter in correct_pos.items():
             if word[pos] != letter:
@@ -226,62 +229,63 @@ def solve_wordle(page, mode: GameMode) -> int:
 
 def solve_wordle_for_target(target_word: str, first_guess: str = "trace") -> WordleState:
     """Solve Wordle for a specific target word and return the complete WordleState.
-    
+
     Args:
         target_word: The 5-letter target word to solve for
         first_guess: The first word to guess (default: "trace")
-        
+
     Returns:
         WordleState with all guesses and their results
-        
+
     Raises:
         ValueError: If target_word is not 5 letters
         RuntimeError: If unable to solve in 6 guesses
     """
     if len(target_word) != 5:
         raise ValueError(f"Target word must be 5 letters, got {len(target_word)}")
-    
+
     target_word = target_word.lower()
     wordle_state = WordleState()
-    
+
     # Make first guess
     first_tiles = _evaluate_guess(first_guess, target_word)
     wordle_state.set_guess(GuessNumber.FIRST, first_tiles)
-    
+
     # Continue guessing until we win or run out of guesses
     for guess_num in range(2, 7):
         filtered_words = filter_possible_words(wordle_state)
-        
+
         if len(filtered_words) == 0:
             logger.warning("No valid words found!")
             return wordle_state
-            
+
         next_guess = filtered_words.iloc[0]["word"]
         next_tiles = _evaluate_guess(next_guess, target_word)
         wordle_state.set_guess(GuessNumber(guess_num), next_tiles)
-        
+
         # Check if we won
         if all(tile.state == "correct" for tile in next_tiles):
             logger.debug(f"Solved '{target_word}' in {guess_num} guesses")
             return wordle_state
-    
+
     logger.warning(f"Failed to solve '{target_word}' in 6 guesses")
     return wordle_state
 
+
 def _evaluate_guess(guess: str, target: str) -> list[Tile]:
     """Evaluate a guess against a target word and return the tile states.
-    
+
     Args:
         guess: The 5-letter word being guessed
         target: The 5-letter target word
-        
+
     Returns:
         List of Tile objects representing the guess result
     """
     tiles = []
     target_letters = list(target)
     guess_letters = list(guess)
-    
+
     # First pass: mark correct letters
     for i, (guess_letter, target_letter) in enumerate(zip(guess_letters, target_letters)):
         if guess_letter == target_letter:
@@ -289,7 +293,7 @@ def _evaluate_guess(guess: str, target: str) -> list[Tile]:
             target_letters[i] = None  # Mark as used
         else:
             tiles.append(Tile(pos=i + 1, letter=guess_letter, state="absent"))
-    
+
     # Second pass: mark present letters (but not in correct position)
     for i, tile in enumerate(tiles):
         if tile.state == "absent":
@@ -298,5 +302,5 @@ def _evaluate_guess(guess: str, target: str) -> list[Tile]:
                 tile.state = "present"
                 # Remove the first occurrence from target_letters
                 target_letters[target_letters.index(guess_letter)] = None
-    
+
     return tiles

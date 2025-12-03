@@ -15,6 +15,7 @@ def _check_wordle_status():
     except Exception as e:
         logger.exception(e)
 
+
 if __name__ == "__main__":
     times = ["10:00", "17:00", "20:00", "22:30", "23:30"]
     for _time in times:

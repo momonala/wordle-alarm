@@ -2,11 +2,11 @@
  Description=Worlde Alarm
  After=multi-user.target
 
- [Service]
- WorkingDirectory=/home/mnalavadi/wordle-alarm
- Type=idle
- ExecStart=/home/mnalavadi/miniconda3/envs/wordle_alarm/bin/python scheduler.py
- User=mnalavadi
+[Service]
+WorkingDirectory=/home/mnalavadi/wordle-alarm
+Type=idle
+ExecStart=/home/mnalavadi/.local/bin/uv run src/scheduler.py
+User=mnalavadi
 
  [Install]
  WantedBy=multi-user.target

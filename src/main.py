@@ -20,6 +20,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 WORDLE_URL = "https://www.nytimes.com/games/wordle/index.html"
 MODE = "REAL"
 WAIT_FOR_LOAD_TIME_MS = 3000
+WAIT_FOR_LOAD_TIME_MS_LONG = 10000
 
 
 @contextmanager
@@ -101,7 +102,7 @@ def check_wordle_status() -> dict[str, bool]:
         context.add_cookies(cookies)
         logger.info("Loaded cookies for authentication")
 
-        page.goto(WORDLE_URL)
+        page.goto(WORDLE_URL, timeout=WAIT_FOR_LOAD_TIME_MS_LONG)
         page.wait_for_timeout(10000)  # Pause to load the page
 
         play_button = page.get_by_test_id(GameMode.PLAY.value).count()

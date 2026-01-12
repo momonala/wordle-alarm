@@ -1,5 +1,8 @@
 # Wordle Alarm
 
+[![CI](https://github.com/momonala/wordle-alarm/actions/workflows/ci.yml/badge.svg)](https://github.com/momonala/wordle-alarm/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/momonala/wordle-alarm/branch/main/graph/badge.svg)](https://codecov.io/gh/momonala/wordle-alarm)
+
 Automated NYT Wordle checker that sends Telegram alerts if you haven't played, and auto-solves the puzzle late at night.
 
 ## Tech Stack
@@ -117,7 +120,7 @@ wordle-alarm/
 │   └── cookies.json          # NYT session cookies (gitignored)
 ├── install/
 │   ├── install.sh            # Linux setup script
-│   └── projects_wordle_alarm.service  # systemd unit file
+│   └── projects_wordle-alarm.service  # systemd unit file
 └── tmp/                      # Debug dumps (HTML pages)
 ```
 
@@ -175,9 +178,9 @@ This installs uv (if not already installed), installs dependencies, and register
 
 Service management:
 ```bash
-sudo systemctl status projects_wordle_alarm.service
-sudo systemctl restart projects_wordle_alarm.service
-sudo journalctl -u projects_wordle_alarm.service -f
+sudo systemctl status projects_wordle-alarm.service
+sudo systemctl restart projects_wordle-alarm.service
+sudo journalctl -u projects_wordle-alarm.service -f
 ```
 
 ## Environment Variables

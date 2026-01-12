@@ -20,7 +20,16 @@ dependencies = [
     "notebook>=7.5.1",
     "pandas>=2.3.3",
     "ruff>=0.14.10",
+    "typer>=0.9.0",
+    "isort>=7.0.0",
 ]
+
+[tool.config]
+# This project is primarily configured via secrets in src/values.py
+# No non-secret configuration needed currently
+
+[project.scripts]
+config = "src.config:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -44,7 +53,7 @@ check_untyped_defs = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --cov=src --cov-report=term-missing"
+addopts = "-s -v --cov=src --cov-report=term-missing"
 
 [tool.coverage.run]
 omit = ["tests/*", "*/test_*.py"]

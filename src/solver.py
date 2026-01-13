@@ -187,8 +187,8 @@ def solve_wordle(page, mode: GameMode) -> int:
     if mode == GameMode.CONTINUE:
         # Parse existing game state
         wordle_state = parse_wordle_tiles(page.content(), wordle_state)
-        logger.info("Parsed existing game state")
-        logger.info(wordle_state)
+        logger.debug("Parsed existing game state")
+        logger.debug(wordle_state)
         # Start from the next guess number
         start_guess = next(
             (num for num in GuessNumber if wordle_state.get_guess(num) is None), GuessNumber.FIRST
@@ -198,30 +198,30 @@ def solve_wordle(page, mode: GameMode) -> int:
         first_guess = "trace"
         guess_word(page, first_guess)
         wordle_state = parse_wordle_tiles(page.content(), wordle_state)
-        logger.info(f"First guess: {first_guess}")
-        logger.info(wordle_state)
+        logger.debug(f"First guess: {first_guess}")
+        logger.debug(wordle_state)
         start_guess = GuessNumber.SECOND
 
     # Continue guessing until we win or run out of guesses
     for guess_num in range(start_guess.value, 7):
         filtered_words = filter_possible_words(wordle_state)
-        logger.info(f"Filtered {len(filtered_words)} words")
+        logger.debug(f"Filtered {len(filtered_words)} words")
 
         if len(filtered_words) == 0:
             logger.error("No valid words found!")
             raise RuntimeError("No valid words found!")
 
         next_guess = filtered_words.iloc[0]["word"]
-        logger.info(f"Guess {guess_num}: {next_guess}")
+        logger.debug(f"Guess {guess_num}: {next_guess}")
         guess_word(page, next_guess)
 
         wordle_state = parse_wordle_tiles(page.content(), wordle_state)
-        logger.info(wordle_state)
+        logger.debug(wordle_state)
 
         # Check if we won (all tiles in the last guess are correct)
         last_guess = wordle_state.get_guess(GuessNumber(guess_num))
         if last_guess and all(tile.state == "correct" for tile in last_guess):
-            logger.info(f"Won in {guess_num} guesses!")
+            logger.debug(f"Won in {guess_num} guesses!")
             return guess_num
 
     raise RuntimeError("Failed to solve Wordle in 6 guesses")
@@ -265,10 +265,10 @@ def solve_wordle_for_target(target_word: str, first_guess: str = "trace") -> Wor
 
         # Check if we won
         if all(tile.state == "correct" for tile in next_tiles):
-            logger.debug(f"Solved '{target_word}' in {guess_num} guesses")
+            logger.info(f"🥳 Solved '{target_word}' in {guess_num} guesses!")
             return wordle_state
 
-    logger.warning(f"Failed to solve '{target_word}' in 6 guesses")
+    logger.warning(f"😭 Failed to solve '{target_word}' in 6 guesses")
     return wordle_state
 
 

@@ -135,5 +135,25 @@ def check_wordle_status() -> dict[str, bool]:
     return {"played_today": has_finished}
 
 
+def play_wordle_incognito() -> None:
+    """Play Wordle in incognito mode (no cookies) and report pass/fail via Telegram."""
+    logger.info(f"Starting incognito Wordle play at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    with playwright_context() as browser:
+        context = browser.new_context()
+        page = context.new_page()
+
+        page.goto(WORDLE_URL, timeout=WAIT_FOR_LOAD_TIME_MS_LONG)
+        page.wait_for_timeout(10000)
+
+        try:
+            score = solve_wordle(page, GameMode.PLAY)
+            send_telegram_alert(f"✅ autosolver [test] {score}/6! ✅")
+            logger.info(f"Wordle Incognito solved successfully in {score} guesses")
+        except RuntimeError as e:
+            send_telegram_alert("Wordle incognito: ❌ Failed to solve in 6 guesses")
+            logger.error(f"Wordle solve failed: {e}")
+
+
 if __name__ == "__main__":
-    result = check_wordle_status()
+    result = play_wordle_incognito()

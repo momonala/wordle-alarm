@@ -156,4 +156,4 @@ def play_wordle_incognito() -> None:
 
 
 if __name__ == "__main__":
-    result = play_wordle_incognito()
+    result = check_wordle_status()

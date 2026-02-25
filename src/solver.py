@@ -79,6 +79,14 @@ class WordleState:
         """Check if maximum guesses (6) have been reached."""
         return self.num_guesses >= 6
 
+    def guess_words(self) -> list[str]:
+        """Return guessed words in order (1..6)."""
+        return [
+            "".join(t.letter for t in self.guesses[GuessNumber(n)])
+            for n in range(1, 7)
+            if self.guesses[GuessNumber(n)] is not None
+        ]
+
 
 def guess_word(page, word: str):
     for char in word:
@@ -173,7 +181,7 @@ def filter_possible_words(wordle_state: WordleState) -> list[str]:
     return valid_words.sort_values("frequency", ascending=False)
 
 
-def solve_wordle(page, mode: GameMode) -> int:
+def solve_wordle(page, mode: GameMode) -> WordleState:
     # close cookies if present
     has_close_cookie_banner = page.get_by_role("button", name="Reject all").count()
     if has_close_cookie_banner:
@@ -222,7 +230,7 @@ def solve_wordle(page, mode: GameMode) -> int:
         last_guess = wordle_state.get_guess(GuessNumber(guess_num))
         if last_guess and all(tile.state == "correct" for tile in last_guess):
             logger.debug(f"Won in {guess_num} guesses!")
-            return guess_num
+            return wordle_state
 
     raise RuntimeError("Failed to solve Wordle in 6 guesses")
 

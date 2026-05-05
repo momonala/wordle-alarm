@@ -6,6 +6,7 @@ from pathlib import Path
 
 import requests
 from playwright.sync_api import sync_playwright
+from playwright._impl._errors import TimeoutError
 
 from auth import load_cookies
 from solver import GameMode, solve_wordle
@@ -38,7 +39,7 @@ def send_telegram_alert(message: str):
 
     try:
         requests.post(url, json=payload, timeout=10)
-        logger.info(f"{message}. Telegram alert sent.")
+        logger.debug(f"{message}. Telegram alert sent.")
     except Exception as e:
         logger.error(f"Failed to send Telegram message: {e}")
 
@@ -50,7 +51,7 @@ def dump_page_content_to_file(page) -> None:
     dump_path.parent.mkdir(parents=True, exist_ok=True)
     with open(str(dump_path), "w", encoding="utf-8") as file:
         file.write(page_content)
-    logger.info("Page content dumped to tmp/wordle_page_dump.html")
+    logger.debug("Page content dumped to tmp/wordle_page_dump.html")
 
 
 def get_wordle_stats(page) -> dict[str, int]:
@@ -89,7 +90,7 @@ def _is_late_night() -> bool:
 
 def check_wordle_status() -> dict[str, bool]:
     """Check if today's Wordle has been played."""
-    logger.info(f"Starting Wordle check at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.debug(f"Starting Wordle check at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     with playwright_context() as browser:
         context = browser.new_context()
@@ -99,7 +100,7 @@ def check_wordle_status() -> dict[str, bool]:
         # Load and set cookies before navigating
         cookies = load_cookies()
         context.add_cookies(cookies)
-        logger.info("Loaded cookies for authentication")
+        logger.debug("Loaded cookies for authentication")
 
         page.goto(WORDLE_URL, timeout=WAIT_FOR_LOAD_TIME_MS_LONG)
         page.wait_for_timeout(10000)  # Pause to load the page
@@ -108,7 +109,7 @@ def check_wordle_status() -> dict[str, bool]:
         continue_button = page.get_by_test_id(GameMode.CONTINUE.value).count()
 
         if play_button:
-            logger.info("Game is not played today")
+            logger.debug("Game is not played today")
             has_finished = False
             send_telegram_alert("🚨 Wordle not played today! 🚨")
             if _is_late_night():
@@ -118,7 +119,7 @@ def check_wordle_status() -> dict[str, bool]:
                     + "\n".join(state.guess_words())
                 )
         elif continue_button:
-            logger.info("Game started today")
+            logger.debug("Game started today")
             has_finished = False
             send_telegram_alert("🚨 Wordle not finished today! 🚨")
             if _is_late_night():
@@ -128,11 +129,17 @@ def check_wordle_status() -> dict[str, bool]:
                     + "\n".join(state.guess_words())
                 )
         else:
-            logger.info("Game is played today!")
+            logger.debug("Game is played today!")
             has_finished = True
-            open_stats_panel(page)
+            try:
+                open_stats_panel(page)
+            except TimeoutError as e:
+                logger.error(f"Failed to open stats panel: {e}")
+                send_telegram_alert("Failed to open stats panel")
+                return {"played_today": has_finished}
+
             stats = get_wordle_stats(page)
-            logger.info(
+            logger.debug(
                 f"Games Played: {stats['played']}, Win %: {stats['win_percentage']}, "
                 f"Current Streak: {stats['current_streak']}, Max Streak: {stats['max_streak']}"
             )
@@ -142,7 +149,7 @@ def check_wordle_status() -> dict[str, bool]:
 
 def play_wordle_incognito() -> None:
     """Play Wordle in incognito mode (no cookies) and report pass/fail via Telegram."""
-    logger.info(f"Starting incognito Wordle play at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.debug(f"Starting incognito Wordle play at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     with playwright_context() as browser:
         context = browser.new_context()
@@ -156,7 +163,7 @@ def play_wordle_incognito() -> None:
             send_telegram_alert(
                 f"✅ autosolver [test] {state.num_guesses}/6! ✅\n" + "\n".join(state.guess_words())
             )
-            logger.info(f"Wordle Incognito solved successfully in {state.num_guesses} guesses")
+            logger.debug(f"Wordle Incognito solved successfully in {state.num_guesses} guesses")
         except RuntimeError as e:
             send_telegram_alert("Wordle incognito: ❌ Failed to solve in 6 guesses")
             logger.error(f"Wordle solve failed: {e}")

@@ -273,7 +273,7 @@ def solve_wordle_for_target(target_word: str, first_guess: str = "trace") -> Wor
 
         # Check if we won
         if all(tile.state == "correct" for tile in next_tiles):
-            logger.info(f"🥳 Solved '{target_word}' in {guess_num} guesses!")
+            logger.debug(f"🥳 Solved '{target_word}' in {guess_num} guesses!")
             return wordle_state
 
     logger.warning(f"😭 Failed to solve '{target_word}' in 6 guesses")

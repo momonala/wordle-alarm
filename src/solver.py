@@ -7,6 +7,8 @@ from time import sleep
 import pandas as pd
 from bs4 import BeautifulSoup
 
+from page_utils import dismiss_cookie_banner
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -182,10 +184,7 @@ def filter_possible_words(wordle_state: WordleState) -> list[str]:
 
 
 def solve_wordle(page, mode: GameMode) -> WordleState:
-    # close cookies if present
-    has_close_cookie_banner = page.get_by_role("button", name="Reject all").count()
-    if has_close_cookie_banner:
-        page.get_by_role("button", name="Reject all").click()
+    if dismiss_cookie_banner(page):
         page.get_by_test_id(mode.value).click()
         page.get_by_role("button", name="Close").click()
         page.wait_for_timeout(1000)

@@ -9,6 +9,7 @@ from playwright.sync_api import sync_playwright
 from playwright._impl._errors import TimeoutError
 
 from auth import load_cookies
+from page_utils import dismiss_cookie_banner
 from solver import GameMode, solve_wordle
 from values import TELEGRAM_CHAT_ID, TELEGRAM_TOKEN
 
@@ -70,6 +71,7 @@ def get_wordle_stats(page) -> dict[str, int]:
 
 def open_stats_panel(page) -> dict[str, int]:
     """Open the latest results modal and return the parsed stats."""
+    dismiss_cookie_banner(page)
 
     def _click_button(test_id: str, role_name: str) -> None:
         button = page.get_by_test_id(test_id)

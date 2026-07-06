@@ -2,33 +2,47 @@ import logging
 import re
 from contextlib import contextmanager
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 
 import requests
+import typer
 from playwright.sync_api import sync_playwright
 from playwright._impl._errors import TimeoutError
 
-from auth import load_cookies
-from page_utils import dismiss_cookie_banner
-from solver import GameMode, solve_wordle
-from values import TELEGRAM_CHAT_ID, TELEGRAM_TOKEN
+from src.auth import load_cookies
+from src.page_utils import dismiss_cookie_banner
+from src.solver import GameMode, solve_wordle
+from src.values import TELEGRAM_CHAT_ID, TELEGRAM_TOKEN
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Get path relative to project root (parent of src/)
 PROJECT_ROOT = Path(__file__).parent.parent
 
 WORDLE_URL = "https://www.nytimes.com/games/wordle/index.html"
-MODE = "REAL"
 WAIT_FOR_LOAD_TIME_MS = 3000
 WAIT_FOR_LOAD_TIME_MS_LONG = 10000
 
 
+class RunMode(str, Enum):
+    REAL = "real"
+    TEST = "test"
+
+
+def configure_logging(mode: RunMode) -> None:
+    level = logging.DEBUG if mode == RunMode.TEST else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        force=True,
+    )
+
+
 @contextmanager
-def playwright_context():
+def playwright_context(mode: RunMode = RunMode.REAL):
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False if MODE == "TEST" else True)
+        browser = p.chromium.launch(headless=mode != RunMode.TEST)
         yield browser
         browser.close()
 
@@ -90,11 +104,11 @@ def _is_late_night() -> bool:
     return datetime.now().hour > 22
 
 
-def check_wordle_status() -> dict[str, bool]:
+def check_wordle_status(mode: RunMode = RunMode.REAL) -> dict[str, bool]:
     """Check if today's Wordle has been played."""
     logger.debug(f"Starting Wordle check at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    with playwright_context() as browser:
+    with playwright_context(mode) as browser:
         context = browser.new_context()
         # context = browser.new_context(storage_state="secrets/auth.json")
         page = context.new_page()
@@ -149,11 +163,11 @@ def check_wordle_status() -> dict[str, bool]:
     return {"played_today": has_finished}
 
 
-def play_wordle_incognito() -> None:
+def play_wordle_incognito(mode: RunMode = RunMode.REAL) -> None:
     """Play Wordle in incognito mode (no cookies) and report pass/fail via Telegram."""
     logger.debug(f"Starting incognito Wordle play at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    with playwright_context() as browser:
+    with playwright_context(mode) as browser:
         context = browser.new_context()
         page = context.new_page()
 
@@ -171,5 +185,24 @@ def play_wordle_incognito() -> None:
             logger.error(f"Wordle solve failed: {e}")
 
 
+def main_cli(
+    mode: RunMode = typer.Option(
+        RunMode.REAL,
+        "--mode",
+        "-m",
+        help="test: debug logging and visible browser; real: production defaults.",
+        case_sensitive=False,
+        show_default=True,
+    ),
+) -> None:
+    """Check today's Wordle status."""
+    configure_logging(mode)
+    check_wordle_status(mode=mode)
+
+
+def main() -> None:
+    typer.run(main_cli)
+
+
 if __name__ == "__main__":
-    result = check_wordle_status()
+    main()

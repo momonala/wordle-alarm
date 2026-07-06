@@ -30,6 +30,7 @@ dependencies = [
 
 [project.scripts]
 config = "src.config:main"
+main = "src.main:main"
 
 [build-system]
 requires = ["hatchling"]

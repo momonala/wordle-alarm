@@ -3,7 +3,7 @@ import time
 
 import schedule
 
-from main import check_wordle_status, play_wordle_incognito
+from src.main import RunMode, check_wordle_status, play_wordle_incognito
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -11,14 +11,14 @@ logger = logging.getLogger(__name__)
 
 def _check_wordle_status():
     try:
-        check_wordle_status()
+        check_wordle_status(mode=RunMode.REAL)
     except Exception as e:
         logger.exception(e)
 
 
 def _play_wordle_incognito():
     try:
-        play_wordle_incognito()
+        play_wordle_incognito(mode=RunMode.REAL)
     except Exception as e:
         logger.exception(e)
 

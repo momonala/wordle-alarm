@@ -7,7 +7,7 @@ from time import sleep
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from page_utils import dismiss_cookie_banner
+from src.page_utils import dismiss_cookie_banner
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

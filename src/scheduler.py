@@ -12,15 +12,15 @@ logger = logging.getLogger(__name__)
 def _check_wordle_status():
     try:
         check_wordle_status(mode=RunMode.REAL)
-    except Exception as e:
-        logger.exception(e)
+    except Exception:
+        logger.exception("Job failed")
 
 
 def _play_wordle_incognito():
     try:
         play_wordle_incognito(mode=RunMode.REAL)
-    except Exception as e:
-        logger.exception(e)
+    except Exception:
+        logger.exception("Job failed")
 
 
 if __name__ == "__main__":

@@ -43,8 +43,10 @@ def configure_logging(mode: RunMode) -> None:
 def playwright_context(mode: RunMode = RunMode.REAL):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=mode != RunMode.TEST)
-        yield browser
-        browser.close()
+        try:
+            yield browser
+        finally:
+            browser.close()
 
 
 def send_telegram_alert(message: str):

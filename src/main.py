@@ -42,7 +42,10 @@ def configure_logging(mode: RunMode) -> None:
 @contextmanager
 def playwright_context(mode: RunMode = RunMode.REAL):
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=mode != RunMode.TEST)
+        browser = p.chromium.launch(
+            headless=mode != RunMode.TEST,
+            args=["--disable-dev-shm-usage", "--disable-gpu", "--disable-extensions"],
+        )
         try:
             yield browser
         finally:

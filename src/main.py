@@ -1,5 +1,6 @@
 import logging
 import re
+import subprocess
 from contextlib import contextmanager
 from datetime import datetime
 from enum import Enum
@@ -50,6 +51,16 @@ def playwright_context(mode: RunMode = RunMode.REAL):
             yield browser
         finally:
             browser.close()
+            try:
+                subprocess.run(
+                    ["sudo", "tee", "/proc/sys/vm/drop_caches"],
+                    input=b"1",
+                    capture_output=True,
+                    check=True,
+                )
+                logger.debug("Dropped page cache after Playwright exit")
+            except Exception as e:
+                logger.warning(f"Failed to drop page cache: {e}")
 
 
 def send_telegram_alert(message: str):

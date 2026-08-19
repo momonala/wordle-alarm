@@ -5,36 +5,6 @@
 
 Automated NYT Wordle checker that sends Telegram alerts if you haven't played, and auto-solves the puzzle late at night.
 
-## Tech Stack
-
-Python 3.12, Playwright (browser automation), BeautifulSoup (HTML parsing), Pandas (word filtering), Schedule (cron-like jobs), Telegram Bot API (notifications)
-
-## Architecture
-
-```mermaid
-flowchart LR
-    subgraph External
-        NYT[NYT Wordle]
-        TG[Telegram API]
-    end
-    subgraph Storage
-        CSV[(wordle-answers.csv)]
-        Cookies[cookies.json]
-    end
-    subgraph App
-        Scheduler[src/scheduler.py]
-        Main[src/main.py]
-        Solver[src/solver.py]
-    end
-
-    Scheduler -->|scheduled checks| Main
-    Cookies -->|auth| Main
-    Main -->|browser automation| NYT
-    Main -->|alerts| TG
-    CSV -->|word list| Solver
-    Main -->|auto-solve| Solver
-```
-
 ## Prerequisites
 
 - Python 3.12
@@ -94,12 +64,12 @@ flowchart LR
 
 **Manual check:**
 ```bash
-python src/main.py
+uv run main
 ```
 
 **Scheduled daemon:**
 ```bash
-python src/scheduler.py
+uv run src/scheduler.py
 ```
 
 Default schedule: 10:00, 17:00, 20:00, 22:30, 23:30 daily
@@ -113,6 +83,8 @@ wordle-alarm/
 │   ├── solver.py             # Auto-solver algorithm and game state
 │   ├── scheduler.py          # Cron-like scheduler daemon
 │   ├── auth.py               # Cookie loading/formatting for Playwright
+│   ├── page_utils.py         # Cookie-banner dismissal and other page helpers
+│   ├── config.py             # Non-secret config from pyproject.toml [tool.config]
 │   └── values.py             # Telegram credentials (gitignored)
 ├── wordle-answers.csv        # Word list with frequency scores
 ├── pyproject.toml            # Project dependencies
@@ -122,6 +94,32 @@ wordle-alarm/
 │   ├── install.sh            # Linux setup script
 │   └── projects_wordle-alarm.service  # systemd unit file
 └── tmp/                      # Debug dumps (HTML pages)
+```
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph External
+        NYT[NYT Wordle]
+        TG[Telegram API]
+    end
+    subgraph Storage
+        CSV[(wordle-answers.csv)]
+        Cookies[cookies.json]
+    end
+    subgraph App
+        Scheduler[src/scheduler.py]
+        Main[src/main.py]
+        Solver[src/solver.py]
+    end
+
+    Scheduler -->|scheduled checks| Main
+    Cookies -->|auth| Main
+    Main -->|browser automation| NYT
+    Main -->|alerts| TG
+    CSV -->|word list| Solver
+    Main -->|auto-solve| Solver
 ```
 
 ## Key Concepts
@@ -166,30 +164,4 @@ WordleState
 | `wordle-answers.csv` | 14,856 five-letter words with frequency scores |
 | `tmp/wordle_page_dump.html` | Debug: last page HTML dump |
 
-## Deployment (Linux)
-
-The `install/` directory contains systemd setup:
-
-```bash
-./install/install.sh
-```
-
-This installs uv (if not already installed), installs dependencies, and registers a systemd service that runs `src/scheduler.py` as a daemon.
-
-Service management:
-```bash
-sudo systemctl status projects_wordle-alarm.service
-sudo systemctl restart projects_wordle-alarm.service
-sudo journalctl -u projects_wordle-alarm.service -f
-```
-
-## Environment Variables
-
-None. All config is in `values.py` and `secrets/cookies.json`.
-
-## Known Limitations
-
-- Requires valid NYT cookies (expires periodically)
-- Headless Chromium may break with NYT site changes
-- Word list is static, doesn't update with new official answers
-- No retry logic for network failures
+No environment variables — all config is in `values.py` and `secrets/cookies.json`.

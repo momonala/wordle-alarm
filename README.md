@@ -74,6 +74,17 @@ uv run src/scheduler.py
 
 Default schedule: 10:00, 17:00, 20:00, 22:30, 23:30 daily
 
+### Streak protection
+
+The 10:00 run also plays a throwaway incognito game, which learns the day's answer either
+way it ends: a win finishes on it, and a loss has NYT reveal it in a toast. That answer is
+cached in `cache/daily_answer.json` under today's date.
+
+If the puzzle still has not been played by 23:30, the auto-solve fires against the real
+account and plays the cached answer straight away — winning in one guess rather than
+re-deriving it and risking the same loss twice. A missing or stale cache entry simply falls
+back to solving from scratch.
+
 ## Project Structure
 
 ```
@@ -82,6 +93,7 @@ wordle-alarm/
 │   ├── main.py               # Entry point, Wordle status checker
 │   ├── solver.py             # Auto-solver algorithm and game state
 │   ├── scheduler.py          # Cron-like scheduler daemon
+│   ├── answer_cache.py       # Caches the day's answer between runs
 │   ├── auth.py               # Cookie loading/formatting for Playwright
 │   ├── page_utils.py         # Cookie-banner dismissal and other page helpers
 │   ├── config.py             # Non-secret config from pyproject.toml [tool.config]
@@ -93,6 +105,7 @@ wordle-alarm/
 ├── install/
 │   ├── install.sh            # Linux setup script
 │   └── projects_wordle-alarm.service  # systemd unit file
+├── cache/                    # Today's answer (gitignored)
 └── tmp/                      # Debug dumps (HTML pages)
 ```
 
@@ -107,6 +120,7 @@ flowchart LR
     subgraph Storage
         CSV[(wordle-answers.csv)]
         Cookies[cookies.json]
+        Answer[(daily_answer.json)]
     end
     subgraph App
         Scheduler[src/scheduler.py]
@@ -116,6 +130,8 @@ flowchart LR
 
     Scheduler -->|scheduled checks| Main
     Cookies -->|auth| Main
+    Main -->|10:00 incognito answer| Answer
+    Answer -->|23:30 streak save| Solver
     Main -->|browser automation| NYT
     Main -->|alerts| TG
     CSV -->|word list| Solver

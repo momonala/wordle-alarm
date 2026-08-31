@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).parent.parent
 WORDLE_WORDS = pd.read_csv(PROJECT_ROOT / "wordle-answers.csv")
 
+MAX_GUESSES = 6
+# Our word list is wider than the list NYT accepts, so a guess can be rejected without
+# landing on the board. Cap total attempts so that can never loop forever.
+MAX_ATTEMPTS = MAX_GUESSES + 2
+
 
 class GameMode(Enum):
     """Enum for Wordle game modes."""
@@ -183,7 +188,38 @@ def filter_possible_words(wordle_state: WordleState) -> list[str]:
     return valid_words.sort_values("frequency", ascending=False)
 
 
-def solve_wordle(page, mode: GameMode) -> WordleState:
+class WordleSolveError(RuntimeError):
+    """Raised when the solver cannot finish the puzzle, carrying the partial game state."""
+
+    def __init__(self, message: str, state: WordleState, answer: str | None = None):
+        super().__init__(message)
+        self.state = state
+        self.answer = answer
+
+
+def extract_revealed_answer(page) -> str | None:
+    """Scrape the answer NYT reveals in a toast once the game is lost.
+
+    Returns None if the toast is absent or does not hold a plain 5-letter word.
+    """
+    try:
+        toasts = page.locator('[class*="Toast-module_toast"]')
+        for i in range(toasts.count()):
+            text = toasts.nth(i).inner_text().strip()
+            if len(text) == 5 and text.isalpha():
+                return text.lower()
+    except Exception as e:
+        logger.warning(f"Failed to read revealed answer: {e}")
+    return None
+
+
+def solve_wordle(page, mode: GameMode, known_answer: str | None = None) -> WordleState:
+    """Play out today's puzzle.
+
+    If `known_answer` is given (from an earlier run that already saw the answer) it is
+    played as the first guess. Should it turn out to be wrong — a stale cache, or NYT
+    rejecting it — solving falls back to deriving guesses normally.
+    """
     if dismiss_cookie_banner(page):
         page.get_by_test_id(mode.value).click()
         page.get_by_role("button", name="Close").click()
@@ -192,46 +228,54 @@ def solve_wordle(page, mode: GameMode) -> WordleState:
     wordle_state = WordleState()
 
     if mode == GameMode.CONTINUE:
-        # Parse existing game state
+        # Pick up whatever has already been played today
         wordle_state = parse_wordle_tiles(page.content(), wordle_state)
         logger.debug("Parsed existing game state")
         logger.debug(wordle_state)
-        # Start from the next guess number
-        start_guess = next(
-            (num for num in GuessNumber if wordle_state.get_guess(num) is None), GuessNumber.FIRST
-        )
-    else:
-        # Start new game with "trace"
+    elif not known_answer:
+        # Open with "trace" — pointless when the answer is already known
         first_guess = "trace"
         guess_word(page, first_guess)
         wordle_state = parse_wordle_tiles(page.content(), wordle_state)
         logger.debug(f"First guess: {first_guess}")
         logger.debug(wordle_state)
-        start_guess = GuessNumber.SECOND
 
     # Continue guessing until we win or run out of guesses
-    for guess_num in range(start_guess.value, 7):
-        filtered_words = filter_possible_words(wordle_state)
-        logger.debug(f"Filtered {len(filtered_words)} words")
+    answer_tried = False
+    attempts = 0
+    while not wordle_state.max_guesses_reached and attempts < MAX_ATTEMPTS:
+        attempts += 1
+        guess_num = wordle_state.num_guesses + 1
+        if known_answer and not answer_tried:
+            # Take the free win; only worth one attempt in case the answer is stale
+            next_guess = known_answer
+            answer_tried = True
+            logger.debug(f"Guess {guess_num}: {next_guess} (cached answer)")
+        else:
+            filtered_words = filter_possible_words(wordle_state)
+            logger.debug(f"Filtered {len(filtered_words)} words")
 
-        if len(filtered_words) == 0:
-            logger.error("No valid words found!")
-            raise RuntimeError("No valid words found!")
+            if len(filtered_words) == 0:
+                logger.error("No valid words found!")
+                raise WordleSolveError("No valid words found!", wordle_state, extract_revealed_answer(page))
 
-        next_guess = filtered_words.iloc[0]["word"]
-        logger.debug(f"Guess {guess_num}: {next_guess}")
+            next_guess = filtered_words.iloc[0]["word"]
+            logger.debug(f"Guess {guess_num}: {next_guess}")
+
+        guesses_before = wordle_state.num_guesses
         guess_word(page, next_guess)
 
         wordle_state = parse_wordle_tiles(page.content(), wordle_state)
         logger.debug(wordle_state)
 
-        # Check if we won (all tiles in the last guess are correct)
-        last_guess = wordle_state.get_guess(GuessNumber(guess_num))
-        if last_guess and all(tile.state == "correct" for tile in last_guess):
-            logger.debug(f"Won in {guess_num} guesses!")
+        if wordle_state.num_guesses == guesses_before:
+            logger.warning(f"Guess '{next_guess}' was rejected by NYT — not counted as a guess")
+
+        if wordle_state.solved:
+            logger.debug(f"Won in {wordle_state.num_guesses} guesses!")
             return wordle_state
 
-    raise RuntimeError("Failed to solve Wordle in 6 guesses")
+    raise WordleSolveError("Failed to solve Wordle in 6 guesses", wordle_state, extract_revealed_answer(page))
 
 
 def solve_wordle_for_target(target_word: str, first_guess: str = "trace") -> WordleState:

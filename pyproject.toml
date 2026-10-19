@@ -20,10 +20,11 @@ dependencies = [
     "ruff>=0.14.10",
     "typer>=0.9.0",
     "isort>=7.0.0",
+    "python-dotenv>=1.2.4",
 ]
 
 [tool.config]
-# This project is primarily configured via secrets in src/values.py
+# This project is primarily configured via secrets in .env
 # No non-secret configuration needed currently
 
 [project.scripts]

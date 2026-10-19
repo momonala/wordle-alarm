@@ -33,10 +33,10 @@ Automated NYT Wordle checker that sends Telegram alerts if you haven't played, a
    uv run playwright install-deps
    ```
 
-4. Configure credentials in `values.py`:
-   ```python
-   TELEGRAM_TOKEN = "your-bot-token"
-   TELEGRAM_CHAT_ID = "your-chat-id"
+4. Copy `.env.example` to `.env` and fill in your credentials:
+   ```
+   TELEGRAM_TOKEN=your-bot-token
+   TELEGRAM_CHAT_ID=your-chat-id
    ```
 
 5. Export NYT cookies to `secrets/cookies.json`:
@@ -97,7 +97,8 @@ wordle-alarm/
 │   ├── auth.py               # Cookie loading/formatting for Playwright
 │   ├── page_utils.py         # Cookie-banner dismissal and other page helpers
 │   ├── config.py             # Non-secret config from pyproject.toml [tool.config]
-│   └── values.py             # Telegram credentials (gitignored)
+│   └── env.py                # Loads Telegram credentials from .env
+├── .env.example              # Stub credentials used in CI; copy to .env (gitignored)
 ├── wordle-answers.csv        # Word list with frequency scores
 ├── pyproject.toml            # Project dependencies
 ├── secrets/
@@ -180,4 +181,4 @@ WordleState
 | `wordle-answers.csv` | 14,856 five-letter words with frequency scores |
 | `tmp/wordle_page_dump.html` | Debug: last page HTML dump |
 
-No environment variables — all config is in `values.py` and `secrets/cookies.json`.
+Telegram credentials come from `.env`; NYT cookies from `secrets/cookies.json`.

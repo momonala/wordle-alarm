@@ -15,7 +15,7 @@ from src.answer_cache import load_answer, store_answer
 from src.auth import load_cookies
 from src.page_utils import dismiss_cookie_banner
 from src.solver import GameMode, WordleSolveError, solve_wordle
-from src.values import TELEGRAM_CHAT_ID, TELEGRAM_TOKEN
+from src.env import TELEGRAM_CHAT_ID, TELEGRAM_TOKEN
 
 logger = logging.getLogger(__name__)
 

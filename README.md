@@ -93,7 +93,7 @@ wordle-alarm/
 │   ├── main.py               # Entry point, Wordle status checker
 │   ├── solver.py             # Auto-solver algorithm and game state
 │   ├── scheduler.py          # Cron-like scheduler daemon
-│   ├── answer_cache.py       # Caches the day's answer between runs
+│   ├── daily_cache.py        # Caches the day's answer and played flag
 │   ├── auth.py               # Cookie loading/formatting for Playwright
 │   ├── page_utils.py         # Cookie-banner dismissal and other page helpers
 │   ├── config.py             # Non-secret config from pyproject.toml [tool.config]

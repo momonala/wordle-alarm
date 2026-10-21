@@ -3,6 +3,7 @@ import time
 
 import schedule
 
+from src.daily_cache import is_played
 from src.main import RunMode, check_wordle_status, play_wordle_incognito
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -10,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 def _check_wordle_status():
+    if is_played():
+        logger.info("Wordle already played today, skipping check")
+        return
     try:
         check_wordle_status(mode=RunMode.REAL)
     except Exception:

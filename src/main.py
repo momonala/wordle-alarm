@@ -1,6 +1,7 @@
 import logging
+import os
 import re
-import subprocess
+import shutil
 from contextlib import contextmanager
 from datetime import datetime
 from enum import Enum
@@ -25,6 +26,8 @@ PROJECT_ROOT = Path(__file__).parent.parent
 WORDLE_URL = "https://www.nytimes.com/games/wordle/index.html"
 WAIT_FOR_LOAD_TIME_MS = 3000
 WAIT_FOR_LOAD_TIME_MS_LONG = 10000
+RAM_TMP_DIR = Path("/dev/shm")
+PLAYWRIGHT_TMP_PATTERNS = ("playwright_chromiumdev_profile-*", "playwright-artifacts-*")
 
 
 class RunMode(str, Enum):
@@ -41,27 +44,28 @@ def configure_logging(mode: RunMode) -> None:
     )
 
 
+def use_ram_for_browser_temp_files(ram_dir: Path = RAM_TMP_DIR) -> None:
+    """Point Playwright's temp profile at a RAM-backed dir, clearing any left by a killed run."""
+    if not ram_dir.is_dir():
+        return
+    for pattern in PLAYWRIGHT_TMP_PATTERNS:
+        for leftover in ram_dir.glob(pattern):
+            shutil.rmtree(leftover, ignore_errors=True)
+    os.environ["TMPDIR"] = str(ram_dir)
+
+
 @contextmanager
 def playwright_context(mode: RunMode = RunMode.REAL):
+    use_ram_for_browser_temp_files()
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=mode != RunMode.TEST,
-            args=["--disable-dev-shm-usage", "--disable-gpu", "--disable-extensions"],
+            args=["--disable-gpu", "--disable-extensions"],
         )
         try:
             yield browser
         finally:
             browser.close()
-            try:
-                subprocess.run(
-                    ["sudo", "tee", "/proc/sys/vm/drop_caches"],
-                    input=b"1",
-                    capture_output=True,
-                    check=True,
-                )
-                logger.debug("Dropped page cache after Playwright exit")
-            except Exception as e:
-                logger.warning(f"Failed to drop page cache: {e}")
 
 
 def send_telegram_alert(message: str):

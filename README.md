@@ -1,7 +1,6 @@
 # Wordle Alarm
 
 [![CI](https://github.com/momonala/wordle-alarm/actions/workflows/ci.yml/badge.svg)](https://github.com/momonala/wordle-alarm/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/momonala/wordle-alarm/branch/main/graph/badge.svg)](https://codecov.io/gh/momonala/wordle-alarm)
 
 Automated NYT Wordle checker that sends Telegram alerts if you haven't played, and auto-solves the puzzle late at night.
 

@@ -1,5 +1,6 @@
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 from enum import Enum
 from pathlib import Path
 from time import sleep
@@ -338,7 +339,7 @@ def _evaluate_guess(guess: str, target: str) -> list[Tile]:
     guess_letters = list(guess)
 
     # First pass: mark correct letters
-    for i, (guess_letter, target_letter) in enumerate(zip(guess_letters, target_letters)):
+    for i, (guess_letter, target_letter) in enumerate(zip(guess_letters, target_letters, strict=True)):
         if guess_letter == target_letter:
             tiles.append(Tile(pos=i + 1, letter=guess_letter, state="correct"))
             target_letters[i] = None  # Mark as used
@@ -346,7 +347,7 @@ def _evaluate_guess(guess: str, target: str) -> list[Tile]:
             tiles.append(Tile(pos=i + 1, letter=guess_letter, state="absent"))
 
     # Second pass: mark present letters (but not in correct position)
-    for i, tile in enumerate(tiles):
+    for tile in tiles:
         if tile.state == "absent":
             guess_letter = tile.letter
             if guess_letter in target_letters:

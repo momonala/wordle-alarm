@@ -17,7 +17,7 @@ def load_cookies() -> list[dict]:
         Each cookie must have sameSite as one of: "Strict", "Lax", or "None"
     """
     try:
-        with open(str(COOKIES_PATH), "r") as f:
+        with open(str(COOKIES_PATH)) as f:
             cookies = json.load(f)
 
         # Format cookies for Playwright

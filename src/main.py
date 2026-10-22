@@ -12,11 +12,16 @@ import typer
 from playwright._impl._errors import TimeoutError
 from playwright.sync_api import sync_playwright
 
-from src.daily_cache import load_answer, mark_played, store_answer
 from src.auth import load_cookies
+from src.daily_cache import load_answer
+from src.daily_cache import mark_played
+from src.daily_cache import store_answer
+from src.env import TELEGRAM_CHAT_ID
+from src.env import TELEGRAM_TOKEN
 from src.page_utils import dismiss_cookie_banner
-from src.solver import GameMode, WordleSolveError, solve_wordle
-from src.env import TELEGRAM_CHAT_ID, TELEGRAM_TOKEN
+from src.solver import GameMode
+from src.solver import WordleSolveError
+from src.solver import solve_wordle
 
 logger = logging.getLogger(__name__)
 

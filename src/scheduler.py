@@ -4,7 +4,9 @@ import time
 import schedule
 
 from src.daily_cache import is_played
-from src.main import RunMode, check_wordle_status, play_wordle_incognito
+from src.main import RunMode
+from src.main import check_wordle_status
+from src.main import play_wordle_incognito
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

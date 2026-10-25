@@ -8,18 +8,13 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "beautifulsoup4>=4.15.0",
+    "pandas>=3.0.6",
     "playwright",
+    "python-dotenv>=1.2.4",
     "requests",
     "schedule",
-    "pandas>=3.0.6",
-    "beautifulsoup4>=4.15.0",
-    "pytest>=9.1.1",
-    "pytest-cov>=7.1.0",
-    "black",
-    "pandas>=3.0.6",
-    "ruff>=0.17.0",
     "typer>=0.27.3",
-    "python-dotenv>=1.2.4",
 ]
 
 [tool.config]

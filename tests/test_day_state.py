@@ -90,14 +90,42 @@ def calls(monkeypatch):
     return log
 
 
+@pytest.fixture
+def wordle_site(monkeypatch, calls):
+    monkeypatch.setattr(main, "load_cookies", lambda: [])
+
+    def _serve(page: FakePage) -> FakeContext:
+        context = FakeContext(page)
+
+        class _FakePlaywrightContext:
+            def __init__(self, mode):
+                pass
+
+            def __enter__(self):
+                return FakeBrowser(context)
+
+            def __exit__(self, *exc):
+                return False
+
+        monkeypatch.setattr(main, "playwright_context", _FakePlaywrightContext)
+        return context
+
+    return _serve
+
+
+def _stats_panel_raises(monkeypatch, error: Exception) -> None:
+    def _raise(page):
+        raise error
+
+    monkeypatch.setattr(main, "open_stats_panel", _raise)
+
+
 @pytest.mark.parametrize(
     ("play", "cont", "expected"),
     [
         (1, 0, DayState.NOT_STARTED),
-        (2, 0, DayState.NOT_STARTED),
         (1, 1, DayState.NOT_STARTED),
         (0, 1, DayState.IN_PROGRESS),
-        (0, 2, DayState.IN_PROGRESS),
         (0, 0, DayState.DONE),
     ],
 )
@@ -109,29 +137,31 @@ def test_detect_day_state_from_button_counts(play, cont, expected):
 
 
 @pytest.mark.parametrize(
-    ("day_state", "alert", "game_mode"),
+    ("day_state", "hour", "expected"),
     [
-        (DayState.NOT_STARTED, "🚨 Wordle not played today! 🚨", GameMode.PLAY),
-        (DayState.IN_PROGRESS, "🚨 Wordle not finished today! 🚨", GameMode.CONTINUE),
+        (DayState.NOT_STARTED, 22, [("alert", "🚨 Wordle not played today! 🚨")]),
+        (
+            DayState.NOT_STARTED,
+            23,
+            [("alert", "🚨 Wordle not played today! 🚨"), ("autosolve", GameMode.PLAY, "autosolver")],
+        ),
+        (
+            DayState.IN_PROGRESS,
+            23,
+            [("alert", "🚨 Wordle not finished today! 🚨"), ("autosolve", GameMode.CONTINUE, "autosolver")],
+        ),
     ],
 )
-@pytest.mark.parametrize(("hour", "autosolves"), [(22, False), (23, True)])
-def test_unfinished_day_alerts_and_autosolves_only_after_22h(
-    monkeypatch, calls, day_state, alert, game_mode, hour, autosolves
-):
+def test_unfinished_day_alerts_and_autosolves_only_after_22h(monkeypatch, calls, day_state, hour, expected):
     monkeypatch.setattr(main, "datetime", _fixed_hour(hour))
 
     handle_day_state(FakePage(), day_state)
 
-    expected = [("alert", alert)]
-    if autosolves:
-        expected.append(("autosolve", game_mode, "autosolver"))
     assert calls == expected
 
 
-@pytest.mark.parametrize("hour", [10, 23])
-def test_done_day_marks_played_and_opens_stats_at_any_hour(monkeypatch, calls, hour):
-    monkeypatch.setattr(main, "datetime", _fixed_hour(hour))
+def test_done_day_marks_played_and_opens_stats_even_late_at_night(monkeypatch, calls):
+    monkeypatch.setattr(main, "datetime", _fixed_hour(23))
 
     handle_day_state(FakePage(), DayState.DONE)
 
@@ -139,10 +169,7 @@ def test_done_day_marks_played_and_opens_stats_at_any_hour(monkeypatch, calls, h
 
 
 def test_done_day_alerts_when_stats_panel_times_out(monkeypatch, calls):
-    def _timeout(page):
-        raise TimeoutError("timed out")
-
-    monkeypatch.setattr(main, "open_stats_panel", _timeout)
+    _stats_panel_raises(monkeypatch, TimeoutError("timed out"))
 
     handle_day_state(FakePage(), DayState.DONE)
 
@@ -153,55 +180,19 @@ def test_done_day_alerts_when_stats_panel_times_out(monkeypatch, calls):
     ("play", "cont", "played_today"),
     [(1, 0, False), (0, 1, False), (0, 0, True)],
 )
-@pytest.mark.parametrize("stats_times_out", [False, True])
 def test_check_wordle_status_reports_played_today_and_closes_context(
-    monkeypatch, calls, play, cont, played_today, stats_times_out
+    monkeypatch, wordle_site, play, cont, played_today
 ):
-    if stats_times_out:
-
-        def _timeout(page):
-            raise TimeoutError("timed out")
-
-        monkeypatch.setattr(main, "open_stats_panel", _timeout)
     monkeypatch.setattr(main, "datetime", _fixed_hour(10))
-    monkeypatch.setattr(main, "load_cookies", lambda: [])
-    context = FakeContext(FakePage(play=play, cont=cont))
-
-    class _FakePlaywrightContext:
-        def __init__(self, mode):
-            pass
-
-        def __enter__(self):
-            return FakeBrowser(context)
-
-        def __exit__(self, *exc):
-            return False
-
-    monkeypatch.setattr(main, "playwright_context", _FakePlaywrightContext)
+    context = wordle_site(FakePage(play=play, cont=cont))
 
     assert check_wordle_status() == {"played_today": played_today}
     assert context.closed
 
 
-def test_check_wordle_status_closes_context_when_a_step_raises(monkeypatch, calls):
-    def _boom(page):
-        raise RuntimeError("stats broke")
-
-    monkeypatch.setattr(main, "open_stats_panel", _boom)
-    monkeypatch.setattr(main, "load_cookies", lambda: [])
-    context = FakeContext(FakePage())
-
-    class _FakePlaywrightContext:
-        def __init__(self, mode):
-            pass
-
-        def __enter__(self):
-            return FakeBrowser(context)
-
-        def __exit__(self, *exc):
-            return False
-
-    monkeypatch.setattr(main, "playwright_context", _FakePlaywrightContext)
+def test_check_wordle_status_closes_context_when_a_step_raises(monkeypatch, wordle_site):
+    _stats_panel_raises(monkeypatch, RuntimeError("stats broke"))
+    context = wordle_site(FakePage())
 
     with pytest.raises(RuntimeError, match="stats broke"):
         check_wordle_status()

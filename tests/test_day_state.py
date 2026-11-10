@@ -1,0 +1,172 @@
+from datetime import datetime
+
+import pytest
+from playwright._impl._errors import TimeoutError
+
+from src import main
+from src.main import DayState
+from src.main import check_wordle_status
+from src.main import detect_day_state
+from src.main import handle_day_state
+from src.solver import GameMode
+
+
+class FakeLocator:
+    def __init__(self, count: int):
+        self._count = count
+
+    def count(self) -> int:
+        return self._count
+
+
+class FakePage:
+    def __init__(self, play: int = 0, cont: int = 0):
+        self._counts = {GameMode.PLAY.value: play, GameMode.CONTINUE.value: cont}
+
+    def get_by_test_id(self, test_id: str) -> FakeLocator:
+        return FakeLocator(self._counts.get(test_id, 0))
+
+    def goto(self, url, timeout):
+        pass
+
+    def wait_for_timeout(self, ms):
+        pass
+
+
+class FakeContext:
+    def __init__(self, page: FakePage):
+        self.page = page
+        self.closed = False
+
+    def new_page(self) -> FakePage:
+        return self.page
+
+    def add_cookies(self, cookies):
+        pass
+
+    def close(self):
+        self.closed = True
+
+
+class FakeBrowser:
+    def __init__(self, context: FakeContext):
+        self._context = context
+
+    def new_context(self) -> FakeContext:
+        return self._context
+
+
+def _fixed_hour(hour: int) -> type[datetime]:
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 11, 10, hour, 30)
+
+    return FixedDatetime
+
+
+@pytest.fixture
+def calls(monkeypatch):
+    log: list[tuple] = []
+    monkeypatch.setattr(main, "send_telegram_alert", lambda msg: log.append(("alert", msg)))
+    monkeypatch.setattr(
+        main, "_auto_solve_and_report", lambda page, mode, label: log.append(("autosolve", mode, label))
+    )
+    monkeypatch.setattr(main, "mark_played", lambda: log.append(("mark_played",)))
+    monkeypatch.setattr(main, "open_stats_panel", lambda page: log.append(("open_stats",)))
+    monkeypatch.setattr(
+        main,
+        "get_wordle_stats",
+        lambda page: {"played": 1, "win_percentage": 100, "current_streak": 1, "max_streak": 1},
+    )
+    return log
+
+
+@pytest.mark.parametrize(
+    ("play", "cont", "expected"),
+    [
+        (1, 0, DayState.NOT_STARTED),
+        (2, 0, DayState.NOT_STARTED),
+        (1, 1, DayState.NOT_STARTED),
+        (0, 1, DayState.IN_PROGRESS),
+        (0, 2, DayState.IN_PROGRESS),
+        (0, 0, DayState.DONE),
+    ],
+)
+def test_detect_day_state_from_button_counts(play, cont, expected):
+    assert detect_day_state(FakePage(play=play, cont=cont)) is expected
+
+
+@pytest.mark.parametrize(
+    ("day_state", "alert", "game_mode"),
+    [
+        (DayState.NOT_STARTED, "🚨 Wordle not played today! 🚨", GameMode.PLAY),
+        (DayState.IN_PROGRESS, "🚨 Wordle not finished today! 🚨", GameMode.CONTINUE),
+    ],
+)
+@pytest.mark.parametrize(("hour", "autosolves"), [(22, False), (23, True)])
+def test_unfinished_day_alerts_and_autosolves_only_after_22h(
+    monkeypatch, calls, day_state, alert, game_mode, hour, autosolves
+):
+    monkeypatch.setattr(main, "datetime", _fixed_hour(hour))
+
+    handle_day_state(FakePage(), day_state)
+
+    expected = [("alert", alert)]
+    if autosolves:
+        expected.append(("autosolve", game_mode, "autosolver"))
+    assert calls == expected
+
+
+@pytest.mark.parametrize("hour", [10, 23])
+def test_done_day_marks_played_and_opens_stats_at_any_hour(monkeypatch, calls, hour):
+    monkeypatch.setattr(main, "datetime", _fixed_hour(hour))
+
+    handle_day_state(FakePage(), DayState.DONE)
+
+    assert calls == [("mark_played",), ("open_stats",)]
+
+
+def test_done_day_alerts_when_stats_panel_times_out(monkeypatch, calls):
+    def _timeout(page):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(main, "open_stats_panel", _timeout)
+
+    handle_day_state(FakePage(), DayState.DONE)
+
+    assert calls == [("mark_played",), ("alert", "Failed to open stats panel")]
+
+
+@pytest.mark.parametrize(
+    ("play", "cont", "played_today"),
+    [(1, 0, False), (0, 1, False), (0, 0, True)],
+)
+@pytest.mark.parametrize("stats_times_out", [False, True])
+def test_check_wordle_status_reports_played_today_and_closes_context(
+    monkeypatch, calls, play, cont, played_today, stats_times_out
+):
+    if stats_times_out:
+
+        def _timeout(page):
+            raise TimeoutError("timed out")
+
+        monkeypatch.setattr(main, "open_stats_panel", _timeout)
+    monkeypatch.setattr(main, "datetime", _fixed_hour(10))
+    monkeypatch.setattr(main, "load_cookies", lambda: [])
+    context = FakeContext(FakePage(play=play, cont=cont))
+
+    class _FakePlaywrightContext:
+        def __init__(self, mode):
+            pass
+
+        def __enter__(self):
+            return FakeBrowser(context)
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(main, "playwright_context", _FakePlaywrightContext)
+
+    assert check_wordle_status() == {"played_today": played_today}
+    assert context.closed

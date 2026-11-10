@@ -155,6 +155,58 @@ def _is_late_night() -> bool:
     return datetime.now().hour > 22
 
 
+class DayState(Enum):
+    NOT_STARTED = "not_started"
+    IN_PROGRESS = "in_progress"
+    DONE = "done"
+
+
+def detect_day_state(page) -> DayState:
+    """Read today's phase from which start button the Wordle landing page offers."""
+    play_button = page.get_by_test_id(GameMode.PLAY.value).count()
+    continue_button = page.get_by_test_id(GameMode.CONTINUE.value).count()
+    if play_button:
+        return DayState.NOT_STARTED
+    if continue_button:
+        return DayState.IN_PROGRESS
+    return DayState.DONE
+
+
+def _nag_and_maybe_autosolve(page, alert: str, game_mode: GameMode) -> None:
+    send_telegram_alert(alert)
+    if _is_late_night():
+        _auto_solve_and_report(page, game_mode, "autosolver")
+
+
+def _log_stats(page) -> None:
+    try:
+        open_stats_panel(page)
+    except TimeoutError as e:
+        logger.error(f"Failed to open stats panel: {e}")
+        send_telegram_alert("Failed to open stats panel")
+        return
+
+    stats = get_wordle_stats(page)
+    logger.debug(
+        f"Games Played: {stats['played']}, Win %: {stats['win_percentage']}, "
+        f"Current Streak: {stats['current_streak']}, Max Streak: {stats['max_streak']}"
+    )
+
+
+def handle_day_state(page, day_state: DayState) -> None:
+    match day_state:
+        case DayState.NOT_STARTED:
+            logger.debug("Game is not played today")
+            _nag_and_maybe_autosolve(page, "🚨 Wordle not played today! 🚨", GameMode.PLAY)
+        case DayState.IN_PROGRESS:
+            logger.debug("Game started today")
+            _nag_and_maybe_autosolve(page, "🚨 Wordle not finished today! 🚨", GameMode.CONTINUE)
+        case DayState.DONE:
+            logger.debug("Game is played today!")
+            mark_played()
+            _log_stats(page)
+
+
 def check_wordle_status(mode: RunMode = RunMode.REAL) -> dict[str, bool]:
     """Check if today's Wordle has been played."""
     logger.debug(f"Starting Wordle check at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -173,41 +225,12 @@ def check_wordle_status(mode: RunMode = RunMode.REAL) -> dict[str, bool]:
             page.goto(WORDLE_URL, timeout=WAIT_FOR_LOAD_TIME_MS_LONG)
             page.wait_for_timeout(10000)  # Pause to load the page
 
-            play_button = page.get_by_test_id(GameMode.PLAY.value).count()
-            continue_button = page.get_by_test_id(GameMode.CONTINUE.value).count()
-
-            if play_button:
-                logger.debug("Game is not played today")
-                has_finished = False
-                send_telegram_alert("🚨 Wordle not played today! 🚨")
-                if _is_late_night():
-                    _auto_solve_and_report(page, GameMode.PLAY, "autosolver")
-            elif continue_button:
-                logger.debug("Game started today")
-                has_finished = False
-                send_telegram_alert("🚨 Wordle not finished today! 🚨")
-                if _is_late_night():
-                    _auto_solve_and_report(page, GameMode.CONTINUE, "autosolver")
-            else:
-                logger.debug("Game is played today!")
-                has_finished = True
-                mark_played()
-                try:
-                    open_stats_panel(page)
-                except TimeoutError as e:
-                    logger.error(f"Failed to open stats panel: {e}")
-                    send_telegram_alert("Failed to open stats panel")
-                    return {"played_today": has_finished}
-
-                stats = get_wordle_stats(page)
-                logger.debug(
-                    f"Games Played: {stats['played']}, Win %: {stats['win_percentage']}, "
-                    f"Current Streak: {stats['current_streak']}, Max Streak: {stats['max_streak']}"
-                )
+            day_state = detect_day_state(page)
+            handle_day_state(page, day_state)
         finally:
             context.close()
 
-    return {"played_today": has_finished}
+    return {"played_today": day_state is DayState.DONE}
 
 
 def play_wordle_incognito(mode: RunMode = RunMode.REAL) -> None:

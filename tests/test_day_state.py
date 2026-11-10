@@ -123,9 +123,9 @@ def _stats_panel_raises(monkeypatch, error: Exception) -> None:
 @pytest.mark.parametrize(
     ("play", "cont", "expected"),
     [
-        (1, 0, DayState.NOT_STARTED),
+        (2, 0, DayState.NOT_STARTED),
         (1, 1, DayState.NOT_STARTED),
-        (0, 1, DayState.IN_PROGRESS),
+        (0, 2, DayState.IN_PROGRESS),
         (0, 0, DayState.DONE),
     ],
 )
@@ -160,8 +160,9 @@ def test_unfinished_day_alerts_and_autosolves_only_after_22h(monkeypatch, calls,
     assert calls == expected
 
 
-def test_done_day_marks_played_and_opens_stats_even_late_at_night(monkeypatch, calls):
-    monkeypatch.setattr(main, "datetime", _fixed_hour(23))
+@pytest.mark.parametrize("hour", [10, 23])
+def test_done_day_marks_played_and_opens_stats_at_any_hour(monkeypatch, calls, hour):
+    monkeypatch.setattr(main, "datetime", _fixed_hour(hour))
 
     handle_day_state(FakePage(), DayState.DONE)
 

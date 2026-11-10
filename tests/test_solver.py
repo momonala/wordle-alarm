@@ -29,6 +29,13 @@ def test_filter_keeps_only_words_matching_green_yellow_and_gray_feedback():
         assert not set(word) & {"t", "c", "e"}
 
 
+def test_filter_keeps_answer_whose_letter_is_gray_once_and_green_elsewhere():
+    state = WordleState()
+    state.set_guess(GuessNumber.FIRST, _tiles("eerie", "xxyxg"))
+
+    assert "crane" in set(filter_possible_words(state)["word"])
+
+
 def test_solved_only_when_one_guess_is_all_green():
     state = WordleState()
     state.set_guess(GuessNumber.FIRST, _tiles("crane", "ggggx"))

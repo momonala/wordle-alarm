@@ -22,9 +22,17 @@ class FakeLocator:
 class FakePage:
     def __init__(self, play: int = 0, cont: int = 0):
         self._counts = {GameMode.PLAY.value: play, GameMode.CONTINUE.value: cont}
+        self.counted: list[str] = []
 
     def get_by_test_id(self, test_id: str) -> FakeLocator:
-        return FakeLocator(self._counts.get(test_id, 0))
+        page = self
+
+        class _RecordingLocator(FakeLocator):
+            def count(self) -> int:
+                page.counted.append(test_id)
+                return super().count()
+
+        return _RecordingLocator(self._counts.get(test_id, 0))
 
     def goto(self, url, timeout):
         pass
@@ -94,7 +102,10 @@ def calls(monkeypatch):
     ],
 )
 def test_detect_day_state_from_button_counts(play, cont, expected):
-    assert detect_day_state(FakePage(play=play, cont=cont)) is expected
+    page = FakePage(play=play, cont=cont)
+
+    assert detect_day_state(page) is expected
+    assert page.counted == [GameMode.PLAY.value, GameMode.CONTINUE.value]
 
 
 @pytest.mark.parametrize(
@@ -169,4 +180,29 @@ def test_check_wordle_status_reports_played_today_and_closes_context(
     monkeypatch.setattr(main, "playwright_context", _FakePlaywrightContext)
 
     assert check_wordle_status() == {"played_today": played_today}
+    assert context.closed
+
+
+def test_check_wordle_status_closes_context_when_a_step_raises(monkeypatch, calls):
+    def _boom(page):
+        raise RuntimeError("stats broke")
+
+    monkeypatch.setattr(main, "open_stats_panel", _boom)
+    monkeypatch.setattr(main, "load_cookies", lambda: [])
+    context = FakeContext(FakePage())
+
+    class _FakePlaywrightContext:
+        def __init__(self, mode):
+            pass
+
+        def __enter__(self):
+            return FakeBrowser(context)
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(main, "playwright_context", _FakePlaywrightContext)
+
+    with pytest.raises(RuntimeError, match="stats broke"):
+        check_wordle_status()
     assert context.closed
